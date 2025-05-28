@@ -17,8 +17,11 @@ except Exception as e:
     st.error(f'Failed to load data: {e}')
     data = pd.DataFrame()
 
-# Calculate DTZ zones
-if not data.empty:
+# Display signals
+if data.empty:
+    st.write('No data loaded. Please select a valid asset pair and timeframe.')
+else:
+    # Calculate DTZ zones
     pdl = data['Low'].iloc[-1]
     pdh = data['High'].iloc[-1]
     if pdh <= pdl:
@@ -32,35 +35,41 @@ if not data.empty:
                     pdl + (tension_span * 0.8),
                     pdh)
 
-# Plot candlestick chart with DTZ zones
-if not data.empty and mtz_zones:
-    fig = go.Figure(data=[go.Candlestick(x=data.index,
-                                            open=data['Open'],
-                                            high=data['High'],
-                                            low=data['Low'],
-                                            close=data['Close'])])
-    for i, mtz in enumerate(mtz_zones):
-        fig.add_annotation(x=data.index[-1],
-                            y=mtz,
-                            text=f'MTZ {i+1}',
-                            showarrow=False)
-    fig.update_layout(xaxis_title='Date',
-                       yaxis_title='Price')
-    st.plotly_chart(fig, use_container_width=True)
+    if mtz_zones:
+        # Plot candlestick chart with DTZ zones
+        fig = go.Figure(data=[go.Candlestick(x=data.index,
+                                                open=data['Open'],
+                                                high=data['High'],
+                                                low=data['Low'],
+                                                close=data['Close'])])
+        for i, mtz in enumerate(mtz_zones):
+            fig.add_annotation(x=data.index[-1],
+                                y=mtz,
+                                text=f'MTZ {i+1}',
+                                showarrow=False)
+        fig.update_layout(xaxis_title='Date',
+                           yaxis_title='Price')
+        st.plotly_chart(fig, use_container_width=True)
 
-# Display AoE and KP values
-if not data.empty and mtz_zones:
-    aoe = (data['Close'].iloc[-1] - data['Close'].iloc[-4]) / 4
-    kp = 1 if data['Close'].iloc[-1] == data['Close'].iloc[-2] else 0
-    st.write(f'AoE: {aoe:.2f}')
-    st.write(f'KP: {kp}')
+        # Display AoE and KP values
+        aoe = (data['Close'].iloc[-1] - data['Close'].iloc[-4]) / 4
+        kp = 1 if data['Close'].iloc[-1] == data['Close'].iloc[-2] else 0
+        st.write(f'AoE: {aoe:.2f}')
+        st.write(f'KP: {kp}')
 
-# Display trade signals
-if asset_pair == 'BTC/USD' and timeframe == '5m':
-    st.write('Recoil Entry: Mean Reversion/Fade')
-    st.write('Absorption Entry: Momentum Continuation')
-elif asset_pair == 'XAU/USD' and timeframe == '15m':
-    st.write('Recoil Entry: Mean Reversion/Fade')
-    st.write('Absorption Entry: Momentum Continuation')
-else:
-    st.write('No trade signals available')
+        # Recoil Entry (Mean Reversion/Fade)
+        if aoe > 0.8 and kp < 2 and mtz_zones[0] <= data['Close'].iloc[-1] <= mtz_zones[-1]:
+            st.write('Recoil Entry: Mean Reversion/Fade')
+            st.write(f'Entry Zone: {mtz_zones[0]} to {mtz_zones[-1]}')
+        elif aoe < 0.8 and kp < 2 and mtz_zones[0] <= data['Close'].iloc[-1] <= mtz_zones[-1]:
+            st.write('No Recoil Entry signal')
+
+        # Absorption Entry (Momentum Continuation)
+        if aoe < 0.4 and kp >= 5 and mtz_zones[1] <= data['Close'].iloc[-1] <= mtz_zones[2]:
+            st.write('Absorption Entry: Momentum Continuation')
+            st.write(f'Entry Zone: {mtz_zones[1]} to {mtz_zones[2]}')
+        elif aoe < 0.4 and kp < 5 and mtz_zones[1] <= data['Close'].iloc[-1] <= mtz_zones[2]:
+            st.write('No Absorption Entry signal')
+
+    else:
+        st.write('No valid DTZ zones.')
