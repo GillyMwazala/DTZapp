@@ -48,14 +48,16 @@ MTZ = {
     'MTZ5': (PDL + 0.8 * TS, PDH)
 }
 
-def get_mtz(price):
+def get_mtz(price):  # price is a float
     for zone, (low, high) in MTZ.items():
         if low <= price <= high:
             return zone
     return None
 
+# Apply to Close prices (scalar values)
+data['MTZ'] = data['Close'].apply(lambda x: get_mtz(float(x)))
+
 # --- Detect AoE and KP ---
-data['MTZ'] = data['Close'].apply(get_mtz)
 data['Zone_Change'] = data['MTZ'] != data['MTZ'].shift(1)
 data['KP_Counter'] = (~data['Zone_Change']).groupby((data['Zone_Change']).cumsum()).cumcount() + 1
 
