@@ -1,66 +1,66 @@
-import pandas as pd
-import numpy as np
-import yfinance as yf
 import streamlit as st
-import matplotlib.pyplot as plt
+import yfinance as yf
+import plotly.graph_objects as go
+import pandas as pd
 
-# Input parameters
-asset_pair = st.selectbox("Select Asset Pair", ["BTC/USD", "XAU/USD"])
-timeframe = st.selectbox("Select Timeframe", ["5m", "15m"])
-data_source = st.selectbox("Select Data Source", ["CSV", "yfinance"])
+st.title('Dynamic Tension Zones (DTZ) Strategy')
+
+# Select asset pair and timeframe
+asset_pair = st.selectbox('Asset Pair', ['BTC/USD', 'XAU/USD'])
+timeframe = st.selectbox('Timeframe', ['5m', '15m'])
 
 # Load historical data
-if data_source == "CSV":
-    data = pd.read_csv(st.file_uploader("Upload CSV", type=["csv"]))
+try:
+    data = yf.download(asset_pair, period='1d')
+    st.write(f'Loaded {len(data)} data points')
+except Exception as e:
+    st.error(f'Failed to load data: {e}')
+    data = pd.DataFrame()
+
+# Calculate DTZ zones
+if not data.empty:
+    pdl = data['Low'].iloc[-1]
+    pdh = data['High'].iloc[-1]
+    if pdh <= pdl:
+        st.error('Failed to calculate DTZ zones: High is less than or equal to Low')
+        mtz_zones = []
+    else:
+        tension_span = pdh - pdl
+        mtz_zones = (pdl + (tension_span * 0.2),
+                    pdl + (tension_span * 0.4),
+                    pdl + (tension_span * 0.6),
+                    pdl + (tension_span * 0.8),
+                    pdh)
+
+# Plot candlestick chart with DTZ zones
+if not data.empty and mtz_zones:
+    fig = go.Figure(data=[go.Candlestick(x=data.index,
+                                            open=data['Open'],
+                                            high=data['High'],
+                                            low=data['Low'],
+                                            close=data['Close'])])
+    for i, mtz in enumerate(mtz_zones):
+        fig.add_annotation(x=data.index[-1],
+                            y=mtz,
+                            text=f'MTZ {i+1}',
+                            showarrow=False)
+    fig.update_layout(xaxis_title='Date',
+                       yaxis_title='Price')
+    st.plotly_chart(fig, use_container_width=True)
+
+# Display AoE and KP values
+if not data.empty and mtz_zones:
+    aoe = (data['Close'].iloc[-1] - data['Close'].iloc[-4]) / 4
+    kp = 1 if data['Close'].iloc[-1] == data['Close'].iloc[-2] else 0
+    st.write(f'AoE: {aoe:.2f}')
+    st.write(f'KP: {kp}')
+
+# Display trade signals
+if asset_pair == 'BTC/USD' and timeframe == '5m':
+    st.write('Recoil Entry: Mean Reversion/Fade')
+    st.write('Absorption Entry: Momentum Continuation')
+elif asset_pair == 'XAU/USD' and timeframe == '15m':
+    st.write('Recoil Entry: Mean Reversion/Fade')
+    st.write('Absorption Entry: Momentum Continuation')
 else:
-    data = yf.download(asset_pair.replace("/", ""), interval=timeframe, period="7d")
-
-# Calculate Previous Day's High and Low
-data['Date'] = pd.to_datetime(data.index)
-previous_day = data[data['Date'].dt.date == (data['Date'].dt.date.max() - pd.Timedelta(days=1))]
-PDH = previous_day['High'].max()
-PDL = previous_day['Low'].min()
-
-# Calculate Tension Span
-TS = PDH - PDL
-
-# Define Micro-Tension Zones
-MTZ1 = (PDL, PDL + 0.2 * TS)
-MTZ2 = (PDL + 0.2 * TS, PDL + 0.4 * TS)
-MTZ3 = (PDL + 0.4 * TS, PDL + 0.6 * TS)
-MTZ4 = (PDL + 0.6 * TS, PDL + 0.8 * TS)
-MTZ5 = (PDL + 0.8 * TS, PDH)
-
-# Monitor Price Movement Across Zones
-data['MTZ'] = np.where(data['Close'] <= MTZ1[1], 'MTZ1',
-                np.where(data['Close'] <= MTZ2[1], 'MTZ2',
-                np.where(data['Close'] <= MTZ3[1], 'MTZ3',
-                np.where(data['Close'] <= MTZ4[1], 'MTZ4', 'MTZ5'))))
-
-# Calculate Angle of Entry and Kinetic Pause
-data['AoE'] = (data['Close'].diff(3) / 3).fillna(0)
-data['KP'] = (data['MTZ'] == data['MTZ'].shift()).astype(int).groupby((data['MTZ'] != data['MTZ'].shift()).cumsum()).cumsum()
-
-# Generate Trade Signals
-def generate_signals(row):
-    if row['MTZ'] == 'MTZ5' and row['AoE'] > 0.8 and row['KP'] < 2:
-        return 'Recoil Entry'
-    elif row['MTZ'] == 'MTZ2' and row['AoE'] < 0.4 and row['KP'] >= 5:
-        return 'Absorption Entry'
-    return None
-
-data['Trade Signal'] = data.apply(generate_signals, axis=1)
-
-# Plotting
-plt.figure(figsize=(14, 7))
-plt.plot(data['Close'], label='Close Price')
-plt.axhline(PDH, color='red', linestyle='--', label='PDH')
-plt.axhline(PDL, color='green', linestyle='--', label='PDL')
-plt.title(f'{asset_pair} Price with Tension Zones')
-plt.legend()
-plt.show()
-
-# Streamlit Dashboard
-st.title("Dynamic Tension Zones Trading Strategy")
-st.line_chart(data['Close'])
-st.write(data[['Date', 'Close', 'Trade Signal']])
+    st.write('No trade signals available')
