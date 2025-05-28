@@ -48,28 +48,45 @@ else:
                                 text=f'MTZ {i+1}',
                                 showarrow=False)
         fig.update_layout(xaxis_title='Date',
-                           yaxis_title='Price')
-        st.plotly_chart(fig, use_container_width=True)
-
-        # Display AoE and KP values
-        aoe = (data['Close'].iloc[-1] - data['Close'].iloc[-4]) / 4
-        kp = 1 if data['Close'].iloc[-1] == data['Close'].iloc[-2] else 0
-        st.write(f'AoE: {aoe:.2f}')
-        st.write(f'KP: {kp}')
+                           yaxis_title='Price',
+                           xaxis_rangeslider_visible=True)
+        fig.update_layout(title='Candlestick Chart')
 
         # Recoil Entry (Mean Reversion/Fade)
-        if aoe > 0.8 and kp < 2 and mtz_zones[0] <= data['Close'].iloc[-1] <= mtz_zones[-1]:
+        if (data['Close'].iloc[-1] >= mtz_zones[0] and data['Close'].iloc[-1] <= mtz_zones[-1] and
+            (data['Close'].iloc[-1] - data['Close'].iloc[-4]) / 4 > 0.8 and
+            (data['Close'].iloc[-1] == data['Close'].iloc[-2] or data['Close'].iloc[-2] == data['Close'].iloc[-3])):
+            fig.add_annotation(x=data.index[-1],
+                                y=data['Close'].iloc[-1],
+                                text='Recoil Entry: Mean Reversion/Fade',
+                                showarrow=False,
+                                textfont=dict(color='green'))
             st.write('Recoil Entry: Mean Reversion/Fade')
             st.write(f'Entry Zone: {mtz_zones[0]} to {mtz_zones[-1]}')
-        elif aoe < 0.8 and kp < 2 and mtz_zones[0] <= data['Close'].iloc[-1] <= mtz_zones[-1]:
+        elif (data['Close'].iloc[-1] >= mtz_zones[0] and data['Close'].iloc[-1] <= mtz_zones[-1] and
+              (data['Close'].iloc[-1] - data['Close'].iloc[-4]) / 4 < 0.8 and
+              (data['Close'].iloc[-1] == data['Close'].iloc[-2] or data['Close'].iloc[-2] == data['Close'].iloc[-3])):
             st.write('No Recoil Entry signal')
 
         # Absorption Entry (Momentum Continuation)
-        if aoe < 0.4 and kp >= 5 and mtz_zones[1] <= data['Close'].iloc[-1] <= mtz_zones[2]:
+        if (data['Close'].iloc[-1] >= mtz_zones[1] and data['Close'].iloc[-1] <= mtz_zones[2] and
+            (data['Close'].iloc[-1] - data['Close'].iloc[-4]) / 4 < 0.4 and
+            (data['Close'].iloc[-1] == data['Close'].iloc[-2] or data['Close'].iloc[-2] == data['Close'].iloc[-3]) and
+            (data['Close'].iloc[-1] - data['Close'].iloc[-6]) / 6 >= 0.4):
+            fig.add_annotation(x=data.index[-1],
+                                y=data['Close'].iloc[-1],
+                                text='Absorption Entry: Momentum Continuation',
+                                showarrow=False,
+                                textfont=dict(color='green'))
             st.write('Absorption Entry: Momentum Continuation')
             st.write(f'Entry Zone: {mtz_zones[1]} to {mtz_zones[2]}')
-        elif aoe < 0.4 and kp < 5 and mtz_zones[1] <= data['Close'].iloc[-1] <= mtz_zones[2]:
+        elif (data['Close'].iloc[-1] >= mtz_zones[1] and data['Close'].iloc[-1] <= mtz_zones[2] and
+              (data['Close'].iloc[-1] - data['Close'].iloc[-4]) / 4 < 0.4 and
+              (data['Close'].iloc[-1] == data['Close'].iloc[-2] or data['Close'].iloc[-2] == data['Close'].iloc[-3]) and
+              (data['Close'].iloc[-1] - data['Close'].iloc[-6]) / 6 < 0.4):
             st.write('No Absorption Entry signal')
+
+        st.plotly_chart(fig, use_container_width=True)
 
     else:
         st.write('No valid DTZ zones.')
